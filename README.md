@@ -76,122 +76,166 @@ This section explains how to run the system, required file formats, internal nod
 
 ---
 
-### ▶️ Run Instructions
+## ▶️ Run Instructions
 
-1. Ensure Python 3.9+ is installed
-2. Activate the virtual environment
-3. Install dependencies
-4. Run the payroll pipeline
-
+### 1. Create and activate virtual environment
 ```bash
+python -m venv venv
+Windows
+
+bash
+Copy code
+venv\Scripts\activate
+macOS / Linux
+
+bash
+Copy code
+source venv/bin/activate
+2. Install dependencies
+bash
+Copy code
+pip install -r requirements.txt
+3. Run payroll pipeline
+bash
+Copy code
 python examples/run_payroll_example.py
+📄 File Formats
+biometric.xlsx
+Used for raw biometric attendance.
 
-## 🚀 Installation
+Required Columns
 
-1. **Clone the repository**:
-   ```bash
-   git clone <repository-url>
-   cd sovereign-payroll-langgraph
-   ```
+employeeid
 
-2. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+employeename
 
-3. **Prepare input data**: Place your biometric, timesheet, and salary master Excel files in the `examples/` directory or update paths accordingly.
+dept
 
----
+Day1 … Day31
 
-## 📖 Usage
+Cell Interpretation
 
-### Basic Example
+09:41 17:21 → PRESENT
 
-Run the payroll pipeline with sample data:
+Empty cell → ABSENT
 
-```python
-from modules.payroll.graph import build_payroll_graph
+Partial or invalid value → ANOMALY
 
-# Build the graph
-app = build_payroll_graph()
+timesheet.xlsx
+Defines expected daily working hours.
 
-# Define initial state with input paths
-state = {
-    "biometric_path": "examples/biometric.xlsx",
-    "timesheet_path": "examples/timesheet.xlsx",
-    "salary_master_path": "examples/salary_master.xlsx",
-    "warnings": [],
-    "errors": [],
-}
+Required Columns
 
-# Execute the pipeline
-result = app.invoke(state)
+employeeid
 
-# Check results
-print("Errors:", result.get("errors", []))
-print("Output file:", result.get("output_path"))
-print("Sovereign score:", result["sovereign_meta"]["readiness_percent"])
-```
+date (YYYY-MM-DD)
 
-### Command Line
+expected_hours (typically 8)
 
-Execute the example script:
+salary_master.xlsx
+Defines monthly salary per employee.
 
-```bash
-python examples/run_payroll_example.py
-```
+Required Columns
 
-This will process sample data and display a summary including errors, warnings, data counts, output path, and Sovereign readiness metadata.
+employeeid
 
----
+monthly_salary
 
-## 🧪 Testing
+🧩 LangGraph Node Descriptions
+Node Name	Description
+load_biometric	Loads and validates biometric attendance data
+load_timesheet	Loads and validates timesheet data
+process_attendance	Converts biometric logs into daily attendance records
+calculate_salary	Computes prorated salary based on attendance
+export_excel	Generates Excel payroll report
+attach_sovereign_meta	Attaches Sovereign readiness evaluation
 
-Run the test suite to validate the payroll flow:
+Each node processes a shared LangGraph state and passes validated outputs to the next stage.
 
-```bash
-python -m pytest tests/ -v
-```
+📊 Output Artifacts
+Excel Output
+Generated at:
 
-The tests verify end-to-end functionality, ensuring data processing, salary calculation, Excel export, and Sovereign evaluation work correctly.
+bash
+Copy code
+output/payroll_output_YYYYMMDD_HHMMSS.xlsx
+Includes:
 
----
+Attendance sheet
 
-## 📊 Sovereign Core Integration
+Payroll sheet
 
-The system integrates with **Sovereign Core** for automated readiness evaluation. After processing, the pipeline generates metadata including:
-
-- **Readiness Score**: Percentage (0-100) based on successful completion of key checks.
-- **Detailed Checks**: Pass/fail status for inputs, processing, calculation, export, and error handling.
-- **Review Notes**: Human-readable feedback on pipeline health.
-
-Example metadata output:
-```json
+Sovereign Metadata (Console Output)
+json
+Copy code
 {
-  "readiness_percent": 100,
+  "engine": "sovereign-payroll-langgraph",
+  "version": "1.0.0",
   "score": 100,
+  "readiness_percent": 100,
   "checks": [
-    {"check": "inputs_loaded", "status": "PASS", "points": 20},
-    {"check": "attendance_processed", "status": "PASS", "points": 20},
-    {"check": "salary_calculated", "status": "PASS", "points": 25},
-    {"check": "excel_exported", "status": "PASS", "points": 20},
-    {"check": "no_runtime_errors", "status": "PASS", "points": 15}
+    {"check": "inputs_loaded", "status": "PASS"},
+    {"check": "attendance_processed", "status": "PASS"},
+    {"check": "salary_calculated", "status": "PASS"},
+    {"check": "excel_exported", "status": "PASS"},
+    {"check": "no_runtime_errors", "status": "PASS"}
   ],
-  "review_notes": ["Pipeline is fully Sovereign-ready."]
+  "review_notes": [
+    "Pipeline is fully Sovereign-ready."
+  ]
 }
-```
+🧪 Testing
+Run all tests:
 
----
+bash
+Copy code
+pytest tests/
+Tests validate:
 
-## 🤝 Contributing
+End-to-end graph execution
 
-1. Fork the repository.
-2. Create a feature branch: `git checkout -b feature/your-feature`.
-3. Make changes and add tests.
-4. Run tests: `python -m pytest tests/`.
-5. Commit changes: `git commit -am 'Add your feature'`.
-6. Push to branch: `git push origin feature/your-feature`.
-7. Submit a pull request.
+Attendance generation
+
+Salary calculation
+
+Sovereign metadata attachment
+
+⚠️ Known Limitations
+Overtime and half-day rules are not implemented in v1.0
+
+Leave management is not included
+
+Salary calculation is prorated by presence days only
+
+No database persistence (file-based processing)
+
+Designed for batch execution, not real-time streaming
+
+These limitations are intentional and can be extended in future versions.
+
+🔐 Sovereign Compliance
+This system is:
+
+Deterministic
+
+Auditable
+
+State-driven
+
+Workflow-orchestrated
+
+Independent of external automation tools
+
+Production-aligned
+
+📌 Final Status
+Engine: LangGraph + Python
+
+Version: v1.0
+
+Readiness: 100%
+
+Status: ✅ Submission Ready
 
 ---
 
