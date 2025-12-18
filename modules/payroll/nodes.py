@@ -4,7 +4,7 @@ from .state import PayrollState
 
 
 # =================================================
-# LOAD BIOMETRIC DATA
+# LOAD BIOMETRIC DATA (DAY 2)
 # =================================================
 def load_biometric(state: PayrollState) -> PayrollState:
     path = state.get("biometric_path")
@@ -44,7 +44,7 @@ def load_biometric(state: PayrollState) -> PayrollState:
 
 
 # =================================================
-# LOAD TIMESHEET DATA
+# LOAD TIMESHEET DATA (DAY 2)
 # =================================================
 def load_timesheet(state: PayrollState) -> PayrollState:
     path = state.get("timesheet_path")
@@ -83,7 +83,7 @@ def load_timesheet(state: PayrollState) -> PayrollState:
 
 
 # =================================================
-# PROCESS ATTENDANCE (DAY 3 CORE)
+# PROCESS ATTENDANCE (DAY 3)
 # =================================================
 def process_attendance(state: PayrollState) -> PayrollState:
     biometric_df = state.get("biometric_df")
@@ -97,16 +97,13 @@ def process_attendance(state: PayrollState) -> PayrollState:
 
     records = []
 
-    # Expected hours lookup
     expected_map = {
         (r["employeeid"], r["date"]): r["expected_hours"]
         for _, r in timesheet_df.iterrows()
     }
 
-    # IMPORTANT: Use FIRST timesheet date only for month/year
-    base_date = timesheet_df["date"].min()
-    year = base_date.year
-    month = base_date.month
+    base_date = timesheet_df["date"].iloc[0]
+    year, month = base_date.year, base_date.month
     last_day = monthrange(year, month)[1]
 
     for _, row in biometric_df.iterrows():
@@ -116,18 +113,12 @@ def process_attendance(state: PayrollState) -> PayrollState:
             if not col.startswith("day"):
                 continue
 
-            # Extract day number safely
-            try:
-                day_num = int(col.replace("day", ""))
-            except ValueError:
-                continue
+            day_num = int(col.replace("day", ""))
 
-            # 🚨 HARD CALENDAR SAFETY (NO CRASH POSSIBLE)
             if day_num < 1 or day_num > last_day:
                 continue
 
-            current_date = pd.Timestamp(year=year, month=month, day=day_num).date()
-
+            current_date = base_date.replace(day=day_num)
             cell = str(row[col]).strip()
             anomaly = False
 
@@ -139,7 +130,6 @@ def process_attendance(state: PayrollState) -> PayrollState:
 
             else:
                 times = cell.split()
-
                 if len(times) < 2:
                     in_time = None
                     out_time = None
@@ -147,27 +137,14 @@ def process_attendance(state: PayrollState) -> PayrollState:
                     status = "ANOMALY"
                     anomaly = True
                 else:
-                    try:
-                        in_time = times[0]
-                        out_time = times[-1]
+                    in_time = times[0]
+                    out_time = times[-1]
+                    t1 = pd.to_datetime(in_time)
+                    t2 = pd.to_datetime(out_time)
+                    actual_hours = round((t2 - t1).seconds / 3600, 2)
+                    status = "PRESENT"
 
-                        t1 = pd.to_datetime(in_time)
-                        t2 = pd.to_datetime(out_time)
-
-                        actual_hours = round(
-                            (t2 - t1).total_seconds() / 3600, 2
-                        )
-                        status = "PRESENT"
-                    except Exception:
-                        in_time = None
-                        out_time = None
-                        actual_hours = 0
-                        status = "ANOMALY"
-                        anomaly = True
-
-            expected_hours = expected_map.get(
-                (emp_id, current_date), 8
-            )
+            expected_hours = expected_map.get((emp_id, current_date), 8)
 
             records.append({
                 "employeeid": emp_id,
@@ -185,15 +162,146 @@ def process_attendance(state: PayrollState) -> PayrollState:
 
 
 # =================================================
-# PLACEHOLDERS (DAY 4+)
+# CALCULATE SALARY (DAY 4)
 # =================================================
 def calculate_salary(state: PayrollState) -> PayrollState:
+    print(">>> calculate_salary NODE EXECUTED <<<")
+
+    attendance_df = state.get("attendance_df")
+    salary_path = state.get("salary_master_path")
+
+    if attendance_df is None:
+        state.setdefault("errors", []).append("Attendance data missing")
+        return state
+
+    if not salary_path:
+        state.setdefault("errors", []).append("Salary master path not provided")
+        return state
+
+    try:
+        salary_df = pd.read_excel(salary_path)
+        salary_df.columns = [c.lower().strip() for c in salary_df.columns]
+
+        if not {"employeeid", "monthly_salary"}.issubset(salary_df.columns):
+            state.setdefault("errors", []).append(
+                "Salary master missing required columns"
+            )
+            return state
+
+        summary = (
+            attendance_df
+            .groupby("employeeid")
+            .agg(
+                present_days=("status", lambda x: (x == "PRESENT").sum()),
+                absent_days=("status", lambda x: (x != "PRESENT").sum()),
+            )
+            .reset_index()
+        )
+
+        summary["total_days"] = summary["present_days"] + summary["absent_days"]
+
+        payroll_df = summary.merge(
+            salary_df,
+            on="employeeid",
+            how="left"
+        )
+
+        payroll_df["payable_salary"] = (
+            payroll_df["monthly_salary"]
+            * payroll_df["present_days"]
+            / payroll_df["total_days"]
+        ).round(2)
+
+        state["payroll_df"] = payroll_df
+
+    except Exception as e:
+        state.setdefault("errors", []).append(
+            f"Salary calculation failed: {e}"
+        )
+
     return state
 
+
+# =================================================
+# DAY 5 PLACEHOLDERS
+# =================================================
+import os
+from datetime import datetime
 
 def export_excel(state: PayrollState) -> PayrollState:
+    attendance_df = state.get("attendance_df")
+    payroll_df = state.get("payroll_df")
+
+    if attendance_df is None or payroll_df is None:
+        state.setdefault("errors", []).append(
+            "Missing data for Excel export"
+        )
+        return state
+
+    try:
+        os.makedirs("output", exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_path = f"output/payroll_output_{timestamp}.xlsx"
+
+        with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
+            attendance_df.to_excel(
+                writer,
+                sheet_name="Attendance",
+                index=False
+            )
+            payroll_df.to_excel(
+                writer,
+                sheet_name="Payroll",
+                index=False
+            )
+
+        state["output_path"] = output_path
+
+    except Exception as e:
+        state.setdefault("errors", []).append(
+            f"Excel export failed: {e}"
+        )
+
     return state
+
 
 
 def attach_sovereign_meta(state: PayrollState) -> PayrollState:
+    errors = state.get("errors", [])
+    warnings = state.get("warnings", [])
+
+    readiness = 100
+
+    if errors:
+        readiness -= 50
+    if warnings:
+        readiness -= 10
+
+    readiness = max(readiness, 0)
+
+    sovereign_meta = {
+        "module": "Sovereign Payroll Engine",
+        "version": "v1.0",
+        "status": "READY" if readiness >= 80 else "NEEDS_REVIEW",
+        "readiness_percent": readiness,
+        "errors_count": len(errors),
+        "warnings_count": len(warnings),
+        "notes": "LangGraph payroll pipeline executed successfully"
+    }
+
+    state["sovereign_meta"] = sovereign_meta
     return state
+
+from sovereign_core.evaluator import evaluate_payroll_state
+
+
+def attach_sovereign_meta(state: PayrollState) -> PayrollState:
+    """
+    Final Sovereign evaluation node.
+    Attaches readiness score, checks, and review notes.
+    """
+    sovereign_meta = evaluate_payroll_state(state)
+    state["sovereign_meta"] = sovereign_meta
+    return state
+
