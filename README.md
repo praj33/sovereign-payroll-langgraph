@@ -46,8 +46,9 @@ Excel Generator
 ↓
 Sovereign Meta Evaluation
 
-yaml
+```yaml
 Copy code
+```
 
 All stages are orchestrated using a **LangGraph StateGraph**.
 
@@ -55,6 +56,7 @@ All stages are orchestrated using a **LangGraph StateGraph**.
 
 ## 📁 Project Structure
 
+```
 sovereign-payroll-langgraph/
 │
 ├── sovereign_core/
@@ -82,9 +84,11 @@ sovereign-payroll-langgraph/
 ├── requirements.txt
 ├── README.md
 └── .gitignore
+```
 
-yaml
+```yaml
 Copy code
+```
 
 ---
 
@@ -93,93 +97,86 @@ Copy code
 ### 1. Create and activate virtual environment
 ```bash
 python -m venv venv
-Windows
-
-bash
-Copy code
+# Windows
 venv\Scripts\activate
-macOS / Linux
-
-bash
-Copy code
+# macOS / Linux
 source venv/bin/activate
-2. Install dependencies
-bash
-Copy code
+```
+
+### 2. Install dependencies
+```bash
 pip install -r requirements.txt
-3. Run payroll pipeline
-bash
-Copy code
+```
+
+### 3. Run payroll pipeline
+```bash
 python examples/run_payroll_example.py
-📄 File Formats
-biometric.xlsx
+```
+
+---
+
+## 📄 File Formats
+
+### biometric.xlsx
 Used for raw biometric attendance.
 
-Required Columns
+**Required Columns:**
+- employeeid
+- employeename
+- dept
+- Day1 … Day31
 
-employeeid
+**Cell Interpretation:**
+- 09:41 17:21 → PRESENT
+- Empty cell → ABSENT
+- Partial or invalid value → ANOMALY
 
-employeename
-
-dept
-
-Day1 … Day31
-
-Cell Interpretation
-
-09:41 17:21 → PRESENT
-
-Empty cell → ABSENT
-
-Partial or invalid value → ANOMALY
-
-timesheet.xlsx
+### timesheet.xlsx
 Defines expected daily working hours.
 
-Required Columns
+**Required Columns:**
+- employeeid
+- date (YYYY-MM-DD)
+- expected_hours (typically 8)
 
-employeeid
-
-date (YYYY-MM-DD)
-
-expected_hours (typically 8)
-
-salary_master.xlsx
+### salary_master.xlsx
 Defines monthly salary per employee.
 
-Required Columns
+**Required Columns:**
+- employeeid
+- monthly_salary
 
-employeeid
+---
 
-monthly_salary
+## 🧩 LangGraph Node Descriptions
 
-🧩 LangGraph Node Descriptions
-Node Name	Description
-load_biometric	Loads and validates biometric attendance data
-load_timesheet	Loads and validates timesheet data
-process_attendance	Converts biometric logs into daily attendance records
-calculate_salary	Computes prorated salary based on attendance
-export_excel	Generates Excel payroll report
-attach_sovereign_meta	Attaches Sovereign readiness evaluation
+| Node Name | Description |
+|-----------|-------------|
+| load_biometric | Loads and validates biometric attendance data |
+| load_timesheet | Loads and validates timesheet data |
+| process_attendance | Converts biometric logs into daily attendance records |
+| calculate_salary | Computes prorated salary based on attendance |
+| export_excel | Generates Excel payroll report |
+| attach_sovereign_meta | Attaches Sovereign readiness evaluation |
 
 Each node processes a shared LangGraph state and passes validated outputs to the next stage.
 
-📊 Output Artifacts
-Excel Output
+---
+
+## 📊 Output Artifacts
+
+### Excel Output
 Generated at:
-
-bash
-Copy code
+```
 output/payroll_output_YYYYMMDD_HHMMSS.xlsx
+```
+
 Includes:
+- Attendance sheet
+- Payroll sheet
 
-Attendance sheet
-
-Payroll sheet
-
-Sovereign Metadata (Console Output)
-json
-Copy code
+### Sovereign Metadata (Console Output)
+```json
 {
   "engine": "sovereign-payroll-langgraph",
   "version": "1.0.0",
@@ -196,57 +193,54 @@ Copy code
     "Pipeline is fully Sovereign-ready."
   ]
 }
-🧪 Testing
+```
+
+---
+
+## 🧪 Testing
+
 Run all tests:
-
-bash
-Copy code
+```bash
 pytest tests/
+```
+
 Tests validate:
+- End-to-end graph execution
+- Attendance generation
+- Salary calculation
+- Sovereign metadata attachment
 
-End-to-end graph execution
+---
 
-Attendance generation
+## ⚠️ Known Limitations
 
-Salary calculation
-
-Sovereign metadata attachment
-
-⚠️ Known Limitations
-Overtime and half-day rules are not implemented in v1.0
-
-Leave management is not included
-
-Salary calculation is prorated by presence days only
-
-No database persistence (file-based processing)
-
-Designed for batch execution, not real-time streaming
+- Overtime and half-day rules are not implemented in v1.0
+- Leave management is not included
+- Salary calculation is prorated by presence days only
+- No database persistence (file-based processing)
+- Designed for batch execution, not real-time streaming
 
 These limitations are intentional and can be extended in future versions.
 
-🔐 Sovereign Compliance
+---
+
+## 🔐 Sovereign Compliance
+
 This system is:
+- Deterministic
+- Auditable
+- State-driven
+- Workflow-orchestrated
+- Independent of external automation tools
+- Production-aligned
 
-Deterministic
+---
 
-Auditable
+## 📌 Final Status
 
-State-driven
-
-Workflow-orchestrated
-
-Independent of external automation tools
-
-Production-aligned
-
-📌 Final Status
-Engine: LangGraph + Python
-
-Version: v1.0
-
-Readiness: 100%
-
-Status: ✅ Submission Ready
+**Engine:** LangGraph + Python  
+**Version:** v1.0  
+**Readiness:** 100%  
+**Status:** ✅ Submission Ready
 
 
