@@ -70,6 +70,22 @@ sovereign-payroll-langgraph/
 
 ---
 
+## 📘 Documentation
+
+This section explains how to run the system, required file formats, internal node responsibilities, and known limitations.
+
+---
+
+### ▶️ Run Instructions
+
+1. Ensure Python 3.9+ is installed
+2. Activate the virtual environment
+3. Install dependencies
+4. Run the payroll pipeline
+
+```bash
+python examples/run_payroll_example.py
+
 ## 🚀 Installation
 
 1. **Clone the repository**:
